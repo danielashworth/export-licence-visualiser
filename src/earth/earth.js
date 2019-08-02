@@ -1,18 +1,24 @@
 import React from 'react';
 import * as THREE from 'three';
 import OrbitControls from 'three-orbitcontrols';
+import { geoInterpolate } from 'd3-geo';
+
+import * as data from '../data/exports.json';
 
 var scene, camera, renderer;
 var controls;
 
-function Marker() {
+const EARTH_RADIUS = 1.0;
+const DEGREE_TO_RADIAN = Math.PI / 180;
+
+function Marker(colour) {
   THREE.Object3D.call(this);
 
   var radius = 0.005;
   var sphereRadius = 0.02;
   var height = 0.05;
 
-  var material = new THREE.MeshPhongMaterial({ color: 0xbab68f });
+  var material = new THREE.MeshPhongMaterial({ color: colour });
 
   var cone = new THREE.Mesh(new THREE.ConeBufferGeometry(radius, height, 8, 1, true), material);
   cone.position.y = height * 0.5;
@@ -26,10 +32,8 @@ function Marker() {
 
 Marker.prototype = Object.create(THREE.Object3D.prototype);
 
-function Earth(radius, texture) {
+function EarthObject(radius, texture) {
   THREE.Object3D.call(this);
-
-  this.userData.radius = radius;
 
   var earth = new THREE.Mesh(
       new THREE.SphereBufferGeometry(radius, 64.0, 48.0),
@@ -41,18 +45,35 @@ function Earth(radius, texture) {
   this.add(earth);
 }
 
-Earth.prototype = Object.create(THREE.Object3D.prototype);
+function convertCoordinateToSpherePoints(coordinate, radius) {
+  var latRad = convertToRadians(coordinate.lat);
+  var lonRad = convertToRadians(-coordinate.lon);
+  var r = EARTH_RADIUS;
 
-Earth.prototype.createMarker = function (lat, lon) {
-  var marker = new Marker();
+  return [Math.cos(latRad) * Math.cos(lonRad) * r, Math.sin(latRad) * r, Math.cos(latRad) * Math.sin(lonRad) * r];
+}
 
-  var latRad = lat * (Math.PI / 180);
-  var lonRad = -lon * (Math.PI / 180);
-  var r = this.userData.radius;
+function convertToRadians(catesianPoint) {
+  return catesianPoint * DEGREE_TO_RADIAN;
+}
 
-  marker.position.set(Math.cos(latRad) * Math.cos(lonRad) * r, Math.sin(latRad) * r, Math.cos(latRad) * Math.sin(lonRad) * r);
+function createCoordinateMarker(coordinate, colour) {
+  var marker = new Marker(colour);
+  
+  var latRad = convertToRadians(coordinate.lat);
+  var lonRad = convertToRadians(-coordinate.lon);
+  var point = convertCoordinateToSpherePoints(coordinate, EARTH_RADIUS);
+
+  marker.position.set(point[0], point[1], point[2]);
   marker.rotation.set(0.0, -lonRad, latRad - Math.PI * 0.5);
 
+  return marker;
+}
+
+EarthObject.prototype = Object.create(THREE.Object3D.prototype);
+
+EarthObject.prototype.createMarker = function (coordinate, colour) {
+  var marker = createCoordinateMarker(coordinate, colour);
   this.add(marker);
 };
 
@@ -89,14 +110,83 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function populateScene() {
-
+function getEarthObject() {
   var texture = new THREE.TextureLoader().load('/images/world_map.jpg');
+  return new EarthObject(1.0, texture);
+}
 
-  var earth = new Earth(1.0, texture);
+function Coordinate(lat, lon) {
+  this.lat = lat
+  this.lon = lon;
+}
 
-  earth.createMarker(51.507222, -0.1275); // London
+function getExportRoute(startCoordinate, endCoordinate, colour) {
+  var start = convertCoordinateToSpherePoints(startCoordinate);
+  var end = convertCoordinateToSpherePoints(endCoordinate);
 
+  const interpolate = geoInterpolate([startCoordinate.lon, startCoordinate.lat], [endCoordinate.lon, endCoordinate.lat]);
+  const midCoord1 = interpolate(0.25);
+  const midCoord2 = interpolate(0.75);
+  const mid1 = convertCoordinateToSpherePoints(new Coordinate(midCoord1[1], midCoord1[0]), EARTH_RADIUS + 20);
+  const mid2 = convertCoordinateToSpherePoints(new Coordinate(midCoord2[1], midCoord2[0]), EARTH_RADIUS + 20);
+
+  var curve = new THREE.CubicBezierCurve3(
+    new THREE.Vector3(start[0], start[1], start[2]),
+    new THREE.Vector3(mid1[0]*1.5, mid1[1]*1.5, mid1[2]*1.5),
+    new THREE.Vector3(mid2[0]*1.5, mid2[1]*1.5, mid2[2]*1.5),
+    new THREE.Vector3(end[0], end[1], end[2])
+  );
+  
+  var points = curve.getPoints( 50 );
+  var geometry = new THREE.BufferGeometry().setFromPoints( points );
+  
+  var material = new THREE.LineBasicMaterial( { color : colour } );
+  
+  // Create the final object to add to the scene
+  return new THREE.Line( geometry, material );
+  
+}
+
+function getRouteColour(exportValue) {
+
+  var colour;
+
+  exportValue = parseFloat(exportValue.replace(/,/g, ''));
+
+  if(exportValue < 1000000) {
+    colour = '#00ff00';
+  } else if (exportValue >= 1000000 && exportValue < 5000000) {
+    colour = '#ff8c00';
+  }
+  else {
+    colour = '#ff0000';
+  }
+
+  return colour;
+}
+
+function getExportRoutes(earthObject) {
+
+  var sourceCoordinates = data.sourceLocation.coordinate;
+  earthObject.createMarker(new Coordinate(sourceCoordinates.lat, sourceCoordinates.lon), '#ffffff');
+
+  data.exportLocations.forEach(function(location) { 
+
+    var routeColour = getRouteColour(location.value);
+    console.log(routeColour);
+    
+    var coordinate = location.coordinate;
+
+    earthObject.createMarker(new Coordinate(coordinate.lat, coordinate.lon), routeColour);
+
+    var line = getExportRoute(new Coordinate(sourceCoordinates.lat, sourceCoordinates.lon), new Coordinate(coordinate.lat, coordinate.lon), routeColour);
+    scene.add(line);
+  });
+}
+
+function populateScene() {
+  var earth = getEarthObject();
+  getExportRoutes(earth);
   scene.add(earth);
 }
 
@@ -105,7 +195,7 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-class Earth2 extends React.Component {
+class Earth extends React.Component {
 
   constructor() { 
     super();
@@ -119,4 +209,4 @@ class Earth2 extends React.Component {
   }
 }
 
-export default Earth2;
+export default Earth;

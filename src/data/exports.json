@@ -1,0 +1,56 @@
+{
+  "sourceLocation": {
+    "name": "United Kingdom",
+    "coordinate": {
+      "lat": "51.507222",
+      "lon": "-0.1275"
+    }
+  },
+  "exportLocations": [
+    {
+      "destination": "Afghanistan",
+      "coordinate": {
+        "lat": "34.5553",
+        "lon": "69.2075"
+      },
+      "licences": "4",
+      "value": "11,661,126"      
+    },
+    {
+      "destination": "Albania",
+      "coordinate": {
+        "lat": "41.1533",
+        "lon": "20.1683"
+      },
+      "licences": "2",
+      "value": "28,208"      
+    },
+    {
+      "destination": "Algeria",
+      "coordinate": {
+        "lat": "28.0339",
+        "lon": "1.6596"
+      },
+      "licences": "13",
+      "value": "7,529,475"      
+    },
+    {
+      "destination": "Somalia",
+      "coordinate": {
+        "lat": "5.1521",
+        "lon": "46.1996"
+      },
+      "licences": "15",
+      "value": "1,295,875"      
+    },
+    {
+      "destination": "Sweeden",
+      "coordinate": {
+        "lat": "60.1282",
+        "lon": "18.6435"
+      },
+      "licences": "121",
+      "value": "9,091,119"      
+    }
+  ]
+}
