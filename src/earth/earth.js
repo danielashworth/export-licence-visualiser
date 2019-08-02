@@ -4,9 +4,12 @@ import OrbitControls from 'three-orbitcontrols';
 import { geoInterpolate } from 'd3-geo';
 
 import * as data from '../data/exports.json';
+import './earth.css';
 
 var scene, camera, renderer;
 var controls;
+
+var earth;
 
 const EARTH_RADIUS = 1.0;
 const DEGREE_TO_RADIAN = Math.PI / 180;
@@ -74,8 +77,20 @@ EarthObject.prototype = Object.create(THREE.Object3D.prototype);
 
 EarthObject.prototype.createMarker = function (coordinate, colour) {
   var marker = createCoordinateMarker(coordinate, colour);
+  this.markers.push(marker);
   this.add(marker);
 };
+
+EarthObject.prototype.removeMarkers = function () {
+  
+  this.markers.forEach(function(marker) {
+    this.earth.remove(marker);
+  });
+
+  this.markers = [];
+};
+
+EarthObject.prototype.markers = [];
 
 function setupScene() {
   scene = new THREE.Scene();
@@ -101,6 +116,16 @@ function setupScene() {
   onResize();
 
   document.body.appendChild(renderer.domElement);
+}
+
+function addSceneLighting() {
+  var ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambient);
+
+  var direcitonal = new THREE.DirectionalLight(0xffffff, 0.5);
+  direcitonal.position.set(5.0, 2.0, 5.0).normalize();
+  scene.add(direcitonal);  
+
 }
 
 function onResize() {
@@ -165,28 +190,57 @@ function getRouteColour(exportValue) {
   return colour;
 }
 
-function getExportRoutes(earthObject) {
+function getExportValue(location) {
+
+  var exportValue = parseFloat(location.value.replace(/,/g, ''));
+  var exportRange;
+
+  if(exportValue < 1000000) {
+    exportRange = 'LOW';
+  } else if(exportValue >= 1000000 && exportValue < 5000000) {
+    exportRange = 'MEDIUM';
+  } else {
+    exportRange = 'HIGH';
+  }
+
+  return exportRange;
+}
+
+function getExportRoutes(earthObject, filterValue) {
 
   var sourceCoordinates = data.sourceLocation.coordinate;
   earthObject.createMarker(new Coordinate(sourceCoordinates.lat, sourceCoordinates.lon), '#ffffff');
 
   data.exportLocations.forEach(function(location) { 
 
-    var routeColour = getRouteColour(location.value);
-    console.log(routeColour);
-    
-    var coordinate = location.coordinate;
+    var exportValue = getExportValue(location);
 
-    earthObject.createMarker(new Coordinate(coordinate.lat, coordinate.lon), routeColour);
+    if((filterValue === 'ANY') || (filterValue === exportValue)) {
 
-    var line = getExportRoute(new Coordinate(sourceCoordinates.lat, sourceCoordinates.lon), new Coordinate(coordinate.lat, coordinate.lon), routeColour);
-    scene.add(line);
+      var routeColour = getRouteColour(location.value);
+      
+      var coordinate = location.coordinate;
+
+      earthObject.createMarker(new Coordinate(coordinate.lat, coordinate.lon), routeColour);
+
+      var line = getExportRoute(new Coordinate(sourceCoordinates.lat, sourceCoordinates.lon), new Coordinate(coordinate.lat, coordinate.lon), routeColour);
+      scene.add(line);
+    }
   });
 }
 
-function populateScene() {
-  var earth = getEarthObject();
-  getExportRoutes(earth);
+function populateScene(filterValue) {
+  
+  for( var i = scene.children.length - 1; i >= 0; i--) {
+    scene.remove(scene.children[i]);
+  }
+
+  //earth.removeMarkers();
+
+  addSceneLighting();
+
+  getExportRoutes(earth, filterValue);
+
   scene.add(earth);
 }
 
@@ -197,15 +251,48 @@ function animate() {
 
 class Earth extends React.Component {
 
-  constructor() { 
-    super();
+  constructor(props) { 
+    super(props);
+    
+    this.state = {value: 'ANY'};
+
+    this.handleChange = this.handleChange.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
+    
     setupScene();
-    populateScene();
+
+    earth = getEarthObject();
+
+    populateScene(this.state.value);
     animate();
   }
 
+  handleChange(event) {
+    this.setState({value: event.target.value});
+  }
+
+  handleSubmit(event) {
+    populateScene(this.state.value);
+    event.preventDefault();
+  }
+
   render() {
-    return <div></div>;
+    return (
+      <div id="filter-pane">
+        <h3>Filter</h3>
+        <form onSubmit={this.handleSubmit}>
+          <label>Contract value:</label>
+          <select className="form-control" value={this.state.value} onChange={this.handleChange}>
+            <option value="ANY">Any</option>
+            <option value="LOW">&lt; £1,000,000</option>
+            <option value="MEDIUM">&gt; £1,000,000 and &lt; £5,000,000</option>
+            <option value="HIGH">&gt; £5,000,000</option>
+          </select>
+          <br/>
+          <button type="submit" className="btn btn-primary">Filter</button>
+        </form>
+      </div>
+    );
   }
 }
 
