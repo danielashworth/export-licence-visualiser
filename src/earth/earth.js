@@ -82,10 +82,10 @@ EarthObject.prototype.createMarker = function (coordinate, colour) {
 };
 
 EarthObject.prototype.removeMarkers = function () {
-  
-  this.markers.forEach(function(marker) {
-    this.earth.remove(marker);
-  });
+
+  while(this.children.length > 1) {
+    this.remove(this.children[1]);
+  }
 
   this.markers = [];
 };
@@ -235,7 +235,7 @@ function populateScene(filterValue) {
     scene.remove(scene.children[i]);
   }
 
-  //earth.removeMarkers();
+  earth.removeMarkers();
 
   addSceneLighting();
 
