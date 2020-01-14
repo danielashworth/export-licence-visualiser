@@ -9,7 +9,9 @@
     "react-dom": "^16.8.6",
     "react-scripts": "3.0.1",
     "three": "^0.107.0",
-    "three-orbitcontrols": "^2.102.2"
+    "three-orbitcontrols": "^2.102.2",
+    "serialize-javascript": ">=2.1.1",
+    "handlebars": ">=4.3.0"
   },
   "scripts": {
     "start": "react-scripts start",
