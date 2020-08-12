@@ -10,7 +10,7 @@
     "react-scripts": "3.0.1",
     "three": "^0.107.0",
     "three-orbitcontrols": "^2.102.2",
-    "serialize-javascript": ">=2.1.1",
+    "serialize-javascript": ">=3.1.0",
     "handlebars": ">=4.3.0"
   },
   "scripts": {
